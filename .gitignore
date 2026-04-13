@@ -42,3 +42,5 @@ next-env.d.ts
 
 # local tool settings
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks/
