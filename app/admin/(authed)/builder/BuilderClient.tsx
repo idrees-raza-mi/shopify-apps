@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { SvgBuilderPanel } from "./SvgBuilderPanel";
+import { CanvasBuilderPanel } from "./CanvasBuilderPanel";
 
 type Tab = "svg" | "canvas";
 
@@ -62,13 +63,7 @@ export function BuilderClient() {
       </div>
 
       {/* Body */}
-      {tab === "svg" ? (
-        <SvgBuilderPanel />
-      ) : (
-        <div className="flex-1 px-10 py-12 text-[13px] text-text-muted">
-          Canvas configurator coming in Phase 4.
-        </div>
-      )}
+      {tab === "svg" ? <SvgBuilderPanel /> : <CanvasBuilderPanel />}
     </div>
   );
 }
