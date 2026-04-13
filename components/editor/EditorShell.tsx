@@ -11,6 +11,7 @@ type EditorShellProps = {
   rightPanel?: React.ReactNode;
   rightPanelVisible?: boolean;
   canvasArea: React.ReactNode;
+  topRightActions?: React.ReactNode;
   onProcess?: () => void;
   processing?: boolean;
 };
@@ -35,6 +36,7 @@ export function EditorShell({
   rightPanel,
   rightPanelVisible = false,
   canvasArea,
+  topRightActions,
   onProcess,
   processing = false,
 }: EditorShellProps) {
@@ -52,7 +54,9 @@ export function EditorShell({
           <span className="w-8 h-px bg-card-border" />
           <StepDot active={false} label="Printing" />
         </div>
-        <div className="w-[260px]" />
+        <div className="w-[260px] flex items-center justify-end">
+          {topRightActions}
+        </div>
       </header>
 
       {/* MAIN ROW */}
