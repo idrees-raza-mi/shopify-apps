@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { fabric as FabricNS } from "fabric";
 import { EditorShell } from "./EditorShell";
+import { addDesignToCart, handoffCheckout } from "@/lib/cart-client";
 import { CanvasOverlay } from "./CanvasOverlay";
 import { UploadToolPanel } from "./UploadToolPanel";
 import { TextToolPanel, cssFamilyFor, type TextStyle } from "./TextToolPanel";
@@ -35,6 +37,8 @@ const SELECTION_STYLES = {
  */
 export function FreeEditor({ config }: { config: CanvasConfig }) {
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const variantId = searchParams.get("variantId") ?? "";
 
   const canvasElRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricLib | null>(null);
@@ -401,7 +405,19 @@ export function FreeEditor({ config }: { config: CanvasConfig }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Export failed");
-      toast.show("Print file generated");
+
+      if (!variantId) {
+        toast.show("Print file ready (open via Shopify product page to add to cart)");
+        return;
+      }
+      const cart = await addDesignToCart({
+        variantId,
+        printUrl: data.printUrl,
+        previewUrl: data.previewUrl,
+        templateId: config.templateId,
+        designType: "canvas",
+      });
+      handoffCheckout(cart.checkoutUrl);
     } catch (e) {
       toast.show(e instanceof Error ? e.message : "Process failed");
     } finally {

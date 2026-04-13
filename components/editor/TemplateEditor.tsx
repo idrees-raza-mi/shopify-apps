@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { EditorShell } from "./EditorShell";
 import { useToast } from "@/components/Toast";
 import type { TemplateConfig } from "@/lib/types";
+import { addDesignToCart, handoffCheckout } from "@/lib/cart-client";
 
 /**
  * Mode 1 — SVG DOM editor.
@@ -18,6 +20,8 @@ import type { TemplateConfig } from "@/lib/types";
  */
 export function TemplateEditor({ config }: { config: TemplateConfig }) {
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const variantId = searchParams.get("variantId") ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -138,8 +142,24 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Export failed");
-      toast.show("Print file generated");
-      // Phase 9 wires this into the Shopify cart.
+
+      if (!variantId) {
+        toast.show("Print file ready (open via Shopify product page to add to cart)");
+        return;
+      }
+
+      const summary = Object.entries(textValues)
+        .map(([id, v]) => `${config.permissions[id]?.label ?? id}: ${v}`)
+        .join(" · ");
+      const cart = await addDesignToCart({
+        variantId,
+        printUrl: data.printUrl,
+        previewUrl: data.previewUrl,
+        templateId: config.templateId,
+        designType: "template",
+        customizationSummary: summary || undefined,
+      });
+      handoffCheckout(cart.checkoutUrl);
     } catch (e) {
       toast.show(e instanceof Error ? e.message : "Process failed");
     } finally {
