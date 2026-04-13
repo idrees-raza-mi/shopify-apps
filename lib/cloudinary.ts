@@ -59,7 +59,8 @@ export function uploadPNG(
 export function uploadJPEG(
   buffer: Buffer,
   folder: string,
-  publicId: string
+  publicId: string,
+  opts?: { width?: number }
 ): Promise<UploadResult> {
   return uploadStream(buffer, {
     resource_type: "image",
@@ -68,5 +69,8 @@ export function uploadJPEG(
     format: "jpg",
     overwrite: true,
     quality: "auto:good",
+    ...(opts?.width
+      ? { transformation: [{ width: opts.width, crop: "scale" }] }
+      : {}),
   });
 }
