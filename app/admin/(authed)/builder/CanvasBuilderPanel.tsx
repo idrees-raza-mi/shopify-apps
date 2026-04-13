@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
+import { Spinner } from "@/components/Spinner";
 import { CopyIcon } from "@/components/admin/Icons";
 import type { CanvasConfig } from "@/lib/types";
 
@@ -134,8 +135,9 @@ export function CanvasBuilderPanel() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="w-full h-11 rounded-lg bg-gold hover:bg-gold-hover text-white text-[13px] font-semibold tracking-[0.02em] disabled:opacity-60"
+          className="w-full h-11 rounded-lg bg-gold hover:bg-gold-hover text-white text-[13px] font-semibold tracking-[0.02em] disabled:opacity-60 inline-flex items-center justify-center gap-2"
         >
+          {saving && <Spinner size={14} />}
           {saving ? "Saving…" : "Save & Publish to Shopify"}
         </button>
       </div>

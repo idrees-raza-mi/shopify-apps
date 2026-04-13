@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AnyConfig } from "@/lib/types";
+import { Spinner } from "@/components/Spinner";
 
 type Step = "design" | "printing";
 
@@ -41,6 +42,28 @@ export function EditorShell({
   processing = false,
 }: EditorShellProps) {
   const [step] = useState<Step>("design");
+  const [tooSmall, setTooSmall] = useState(false);
+
+  useEffect(() => {
+    const check = () => setTooSmall(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  if (tooSmall) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-cream text-[#1a1a1a] px-6 text-center">
+        <div className="max-w-xs">
+          <div className="font-serif-display italic text-[24px]">Event Besties</div>
+          <p className="mt-4 text-[13px] text-text-muted leading-relaxed">
+            This editor works best on desktop or tablet. Please reopen on a
+            larger screen to customize your design.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 flex flex-col bg-cream text-[#1a1a1a]">
@@ -60,7 +83,7 @@ export function EditorShell({
       </header>
 
       {/* MAIN ROW */}
-      <div className="flex-1 min-h-0 flex">
+      <div className="flex-1 min-h-0 flex relative">
         <aside className="w-[260px] shrink-0 bg-white border-r border-card-border overflow-y-auto">
           {leftPanel}
         </aside>
@@ -73,6 +96,24 @@ export function EditorShell({
           <aside className="w-[210px] shrink-0 bg-white border-l border-card-border overflow-y-auto">
             {rightPanel}
           </aside>
+        )}
+
+        {processing && (
+          <div className="absolute inset-0 z-40 bg-black/30 flex items-center justify-center">
+            <div className="bg-white rounded-card shadow-xl px-6 py-5 flex items-center gap-4">
+              <span className="text-[#1a1a1a]">
+                <Spinner size={22} />
+              </span>
+              <div>
+                <div className="text-[13px] font-medium">
+                  Generating high-res file…
+                </div>
+                <div className="text-[11px] text-text-muted">
+                  This may take a few seconds
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -98,8 +139,9 @@ export function EditorShell({
           type="button"
           onClick={onProcess}
           disabled={processing || !onProcess}
-          className="h-10 px-6 rounded-lg bg-gold hover:bg-gold-hover text-white text-[14px] font-bold tracking-[0.02em] disabled:opacity-60"
+          className="h-10 px-6 rounded-lg bg-gold hover:bg-gold-hover text-white text-[14px] font-bold tracking-[0.02em] disabled:opacity-60 inline-flex items-center gap-2"
         >
+          {processing && <Spinner size={14} />}
           {processing ? "Processing…" : "Process"}
         </button>
       </footer>
