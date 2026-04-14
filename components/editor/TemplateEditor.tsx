@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { EditorShell } from "./EditorShell";
 import { useToast } from "@/components/Toast";
 import type { TemplateConfig } from "@/lib/types";
-import { addDesignToCart, handoffCheckout } from "@/lib/cart-client";
+import { handoffDesign } from "@/lib/cart-client";
 
 /**
  * Mode 1 — SVG DOM editor.
@@ -151,7 +151,7 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
       const summary = Object.entries(textValues)
         .map(([id, v]) => `${config.permissions[id]?.label ?? id}: ${v}`)
         .join(" · ");
-      const cart = await addDesignToCart({
+      await handoffDesign({
         variantId,
         printUrl: data.printUrl,
         previewUrl: data.previewUrl,
@@ -159,7 +159,6 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
         designType: "template",
         customizationSummary: summary || undefined,
       });
-      handoffCheckout(cart.checkoutUrl);
     } catch (e) {
       toast.show(e instanceof Error ? e.message : "Process failed");
     } finally {

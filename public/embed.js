@@ -129,14 +129,43 @@
       });
 
       function onMessage(e) {
-        if (
-          e.data &&
-          e.data.type === "DESIGN_ADDED_TO_CART" &&
-          typeof e.data.checkoutUrl === "string"
-        ) {
-          cleanup();
-          window.location.href = e.data.checkoutUrl;
+        if (!e.data || e.data.type !== "DESIGN_READY" || !e.data.payload) return;
+        var p = e.data.payload;
+        var properties = {
+          _print_file_url: p.printUrl,
+          _preview_url: p.previewUrl,
+          _template_id: p.templateId,
+          _design_type: p.designType,
+        };
+        if (p.customizationSummary) {
+          properties.Customization = p.customizationSummary;
         }
+        fetch("/cart/add.js", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            id: p.variantId,
+            quantity: 1,
+            properties: properties,
+          }),
+        })
+          .then(function (r) {
+            if (!r.ok) {
+              return r.text().then(function (t) {
+                throw new Error("cart/add.js " + r.status + ": " + t);
+              });
+            }
+            return r.json();
+          })
+          .then(function () {
+            cleanup();
+            window.location.href = "/cart";
+          })
+          .catch(function (err) {
+            console.error("[EventBesties]", err);
+            alert("Could not add your design to the cart. Please try again.");
+          });
       }
 
       function cleanup() {
