@@ -45,6 +45,18 @@ async function launchBrowser(): Promise<Browser> {
   });
 }
 
+/**
+ * Compute a deviceScaleFactor that keeps the final rasterised output
+ * under ~15 megapixels. Large print SVGs (e.g. 2500x5000) would
+ * otherwise blow past Vercel's 1 GB function memory at the default 3x.
+ */
+function clampScaleFactor(width: number, height: number, preferred = 3): number {
+  const MAX_PIXELS = 15_000_000;
+  const area = Math.max(1, width * height);
+  const maxScale = Math.sqrt(MAX_PIXELS / area);
+  return Math.max(1, Math.min(preferred, maxScale));
+}
+
 export async function renderTemplateSVG(
   svgString: string,
   width: number,
@@ -56,7 +68,7 @@ export async function renderTemplateSVG(
     await page.setViewport({
       width: Math.max(1, Math.ceil(width)),
       height: Math.max(1, Math.ceil(height)),
-      deviceScaleFactor: 3,
+      deviceScaleFactor: clampScaleFactor(width, height),
     });
     const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 html,body{margin:0;padding:0;background:#ffffff;}
@@ -85,7 +97,7 @@ export async function renderFabricJSON(
     await page.setViewport({
       width: Math.max(1, Math.ceil(width)),
       height: Math.max(1, Math.ceil(height)),
-      deviceScaleFactor: 3,
+      deviceScaleFactor: clampScaleFactor(width, height),
     });
 
     const json = JSON.stringify(fabricJSON);
