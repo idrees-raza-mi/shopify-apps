@@ -62,18 +62,25 @@ export async function addDesignToCart({
 }
 
 /**
- * Either navigates the top window to the checkout URL, or — if we're in an
- * iframe (Shopify embed) — posts a message to the parent window so the embed
- * script can dismiss the modal and navigate Shopify itself.
+ * Sends the shopper to the Shopify /cart page where the preview image
+ * swap runs (Shopify's hosted checkout cannot render custom per-line
+ * images on non-Plus plans, so the cart is the last place we can show
+ * the customer their actual design before payment).
+ *
+ * In the Shopify embed modal we post a message so the embed can dismiss
+ * the iframe and navigate the parent window. Standalone (no parent) we
+ * navigate directly.
  */
 export function handoffCheckout(checkoutUrl: string) {
   if (typeof window === "undefined") return;
+  const cartUrl = "/cart";
   if (window.parent && window.parent !== window) {
     window.parent.postMessage(
-      { type: "DESIGN_ADDED_TO_CART", checkoutUrl },
+      { type: "DESIGN_ADDED_TO_CART", checkoutUrl: cartUrl },
       "*"
     );
   } else {
-    window.location.href = checkoutUrl;
+    window.location.href = cartUrl;
   }
+  void checkoutUrl;
 }
