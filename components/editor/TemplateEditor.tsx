@@ -6,6 +6,10 @@ import { EditorShell } from "./EditorShell";
 import { useToast } from "@/components/Toast";
 import type { TemplateConfig } from "@/lib/types";
 import { handoffDesign } from "@/lib/cart-client";
+// ZOOM_FEATURE_START
+import { useCanvasZoom } from "@/hooks/useCanvasZoom";
+import { ZoomControls } from "./ZoomControls";
+// ZOOM_FEATURE_END
 
 /**
  * Mode 1 — SVG DOM editor.
@@ -24,6 +28,18 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
   const variantId = searchParams.get("variantId") ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  // ZOOM_FEATURE_START
+  const zoomContainerRef = useRef<HTMLDivElement | null>(null);
+  const zoomOuterRef = useRef<HTMLDivElement | null>(null);
+  const zoomInnerRef = useRef<HTMLDivElement | null>(null);
+  const zoom = useCanvasZoom({
+    canvasWidth: config.canvasWidth,
+    canvasHeight: config.canvasHeight,
+    containerRef: zoomContainerRef,
+    outerRef: zoomOuterRef,
+    innerRef: zoomInnerRef,
+  });
+  // ZOOM_FEATURE_END
 
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -64,10 +80,11 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
           return;
         }
         svg.style.pointerEvents = "none";
-        svg.style.maxWidth = "100%";
-        svg.style.maxHeight = "100%";
-        svg.style.height = "auto";
+        // ZOOM_FEATURE_START
         svg.style.display = "block";
+        svg.style.width = "100%";
+        svg.style.height = "100%";
+        // ZOOM_FEATURE_END
         svgRef.current = svg;
 
         // Read initial values for each unlocked field.
@@ -228,18 +245,29 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
   );
 
   const canvasArea = (
-    <div className="bg-white border border-card-border rounded-card p-6 max-w-[680px] w-full max-h-[80vh] flex items-center justify-center overflow-hidden">
+    // ZOOM_FEATURE_START
+    <div
+      ref={zoomContainerRef}
+      className={`w-full h-full flex items-center justify-center ${
+        zoom.isOverflowing ? "overflow-auto" : "overflow-hidden"
+      }`}
+    >
       {loadError ? (
         <div className="text-[12px] text-text-muted text-center">
           Cannot render preview without a valid SVG URL.
         </div>
       ) : (
-        <div
-          ref={containerRef}
-          className="w-full flex items-center justify-center"
-        />
+        <div ref={zoomOuterRef} className="shrink-0">
+          <div
+            ref={zoomInnerRef}
+            className="bg-white border border-card-border rounded-card shadow-md"
+          >
+            <div ref={containerRef} className="w-full h-full" />
+          </div>
+        </div>
       )}
     </div>
+    // ZOOM_FEATURE_END
   );
 
   return (
@@ -247,6 +275,17 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
       config={config}
       leftPanel={leftPanel}
       canvasArea={canvasArea}
+      // ZOOM_FEATURE_START
+      topRightActions={
+        <ZoomControls
+          zoomPercent={zoom.zoomPercent}
+          onZoomIn={zoom.zoomIn}
+          onZoomOut={zoom.zoomOut}
+          onReset={zoom.resetZoom}
+          onSetZoom={zoom.setZoomPercent}
+        />
+      }
+      // ZOOM_FEATURE_END
       onProcess={handleProcess}
       processing={processing}
     />

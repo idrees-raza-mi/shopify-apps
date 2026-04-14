@@ -14,6 +14,10 @@ import { useToast } from "@/components/Toast";
 import { FabricHistory } from "@/lib/fabric-history";
 import { googleFontsHref } from "@/lib/google-fonts";
 import type { CanvasConfig } from "@/lib/types";
+// ZOOM_FEATURE_START
+import { useCanvasZoom } from "@/hooks/useCanvasZoom";
+import { ZoomControls } from "./ZoomControls";
+// ZOOM_FEATURE_END
 
 type FabricLib = typeof FabricNS;
 type FabricCanvas = FabricNS.Canvas;
@@ -44,6 +48,18 @@ export function FreeEditor({ config }: { config: CanvasConfig }) {
   const fabricRef = useRef<FabricLib | null>(null);
   const canvasRef = useRef<FabricCanvas | null>(null);
   const historyRef = useRef<FabricHistory | null>(null);
+  // ZOOM_FEATURE_START
+  const zoomContainerRef = useRef<HTMLDivElement | null>(null);
+  const zoomOuterRef = useRef<HTMLDivElement | null>(null);
+  const zoomInnerRef = useRef<HTMLDivElement | null>(null);
+  const zoom = useCanvasZoom({
+    canvasWidth: config.displayW,
+    canvasHeight: config.displayH,
+    containerRef: zoomContainerRef,
+    outerRef: zoomOuterRef,
+    innerRef: zoomInnerRef,
+  });
+  // ZOOM_FEATURE_END
 
   const [ready, setReady] = useState(false);
   const [textPanelOpen, setTextPanelOpen] = useState(false);
@@ -461,18 +477,34 @@ export function FreeEditor({ config }: { config: CanvasConfig }) {
   );
 
   const canvasArea = (
+    // ZOOM_FEATURE_START
     <div
-      className="relative shadow-md"
-      style={{ width: config.displayW, height: config.displayH }}
+      ref={zoomContainerRef}
+      className={`w-full h-full flex items-center justify-center ${
+        zoom.isOverflowing ? "overflow-auto" : "overflow-hidden"
+      }`}
     >
-      <canvas ref={canvasElRef} width={config.displayW} height={config.displayH} />
-      <CanvasOverlay
-        width={config.displayW}
-        height={config.displayH}
-        bleedPx={config.bleedPx}
-        safePx={config.safePx}
-      />
+      <div ref={zoomOuterRef} className="relative shrink-0">
+        <div
+          ref={zoomInnerRef}
+          className="relative shadow-md"
+          style={{ width: config.displayW, height: config.displayH }}
+        >
+          <canvas
+            ref={canvasElRef}
+            width={config.displayW}
+            height={config.displayH}
+          />
+          <CanvasOverlay
+            width={config.displayW}
+            height={config.displayH}
+            bleedPx={config.bleedPx}
+            safePx={config.safePx}
+          />
+        </div>
+      </div>
     </div>
+    // ZOOM_FEATURE_END
   );
 
   // Suppress unused warning — cssFamilyFor is exported for future external use.
@@ -486,22 +518,34 @@ export function FreeEditor({ config }: { config: CanvasConfig }) {
       rightPanelVisible={!!active}
       canvasArea={canvasArea}
       topRightActions={
-        <UndoRedoBar
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={() =>
-            historyRef.current?.undo(() => {
-              captureActive();
-              refreshHistoryFlags();
-            })
-          }
-          onRedo={() =>
-            historyRef.current?.redo(() => {
-              captureActive();
-              refreshHistoryFlags();
-            })
-          }
-        />
+        <div className="flex items-center gap-2">
+          {/* ZOOM_FEATURE_START */}
+          <ZoomControls
+            zoomPercent={zoom.zoomPercent}
+            onZoomIn={zoom.zoomIn}
+            onZoomOut={zoom.zoomOut}
+            onReset={zoom.resetZoom}
+            onSetZoom={zoom.setZoomPercent}
+          />
+          <span className="w-px h-5 bg-card-border" />
+          {/* ZOOM_FEATURE_END */}
+          <UndoRedoBar
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={() =>
+              historyRef.current?.undo(() => {
+                captureActive();
+                refreshHistoryFlags();
+              })
+            }
+            onRedo={() =>
+              historyRef.current?.redo(() => {
+                captureActive();
+                refreshHistoryFlags();
+              })
+            }
+          />
+        </div>
       }
       onProcess={handleProcess}
       processing={processing}
