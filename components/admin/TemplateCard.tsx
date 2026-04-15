@@ -3,45 +3,59 @@
 import type { DashboardItem } from "@/lib/types";
 import { EyeIcon } from "./Icons";
 
-function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 3)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function gradientFor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const a = h % 360;
-  const b = (a + 40) % 360;
-  return `linear-gradient(135deg, hsl(${a} 35% 78%) 0%, hsl(${b} 30% 62%) 100%)`;
-}
-
 type TemplateCardProps = {
   item: DashboardItem;
   onPreview: (item: DashboardItem) => void;
 };
 
+function CanvasShapePreview({
+  displayW,
+  displayH,
+  printWidthCm,
+  printHeightCm,
+}: {
+  displayW: number;
+  displayH: number;
+  printWidthCm: number;
+  printHeightCm: number;
+}) {
+  const MAX_W = 220;
+  const MAX_H = 150;
+  const ratio = displayW / displayH;
+  let w = MAX_W;
+  let h = MAX_W / ratio;
+  if (h > MAX_H) {
+    h = MAX_H;
+    w = MAX_H * ratio;
+  }
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div
+        className="bg-white border border-card-border shadow-sm rounded-sm"
+        style={{ width: w, height: h }}
+        aria-hidden
+      />
+      <div className="text-[10px] tracking-[0.06em] text-text-muted uppercase">
+        {printWidthCm} × {printHeightCm} cm
+      </div>
+    </div>
+  );
+}
+
 export function TemplateCard({ item, onPreview }: TemplateCardProps) {
   const { config } = item;
   const isTemplate = config.type === "template";
   const svgUrl = isTemplate ? config.svgUrl : "";
-  const initials = initialsOf(config.productName);
 
   return (
     <div className="bg-white border border-card-border rounded-card overflow-hidden flex flex-col">
       <div
-        className="h-[180px] flex items-center justify-center"
-        style={
-          svgUrl
-            ? { background: "#f8f5f0" }
-            : { background: gradientFor(config.productName) }
-        }
+        className="h-[180px] flex items-center justify-center p-3"
+        style={{
+          background: svgUrl ? "#f8f5f0" : "#f4f1ea",
+        }}
       >
-        {svgUrl ? (
+        {isTemplate && svgUrl ? (
           // Raw <img> intentional: the file is on Cloudinary and is an SVG/raw asset.
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -49,10 +63,15 @@ export function TemplateCard({ item, onPreview }: TemplateCardProps) {
             alt={config.productName}
             className="max-w-[80%] max-h-[150px] object-contain"
           />
+        ) : !isTemplate ? (
+          <CanvasShapePreview
+            displayW={config.displayW}
+            displayH={config.displayH}
+            printWidthCm={config.printWidthCm}
+            printHeightCm={config.printHeightCm}
+          />
         ) : (
-          <div className="text-white font-serif-display text-[44px] tracking-wider drop-shadow-sm">
-            {initials}
-          </div>
+          <div className="text-text-muted text-[11px]">No preview</div>
         )}
       </div>
 
