@@ -58,8 +58,8 @@ export async function handoffDesign(payload: DesignReadyPayload): Promise<void> 
       cartId: localStorage.getItem(CART_ID_KEY),
       quantity: 1,
       attributes: [
-        { key: "_print_file_url", value: payload.printUrl },
-        { key: "_preview_url", value: payload.previewUrl },
+        { key: "_Print file", value: payload.printUrl },
+        { key: "_Preview", value: payload.previewUrl },
         { key: "_template_id", value: payload.templateId },
         { key: "_design_type", value: payload.designType },
         ...(payload.customizationSummary

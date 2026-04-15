@@ -101,8 +101,8 @@ export function PreviewModal({ item, onClose }: PreviewModalProps) {
         </button>
 
         {/* Left preview panel — 42% */}
-        <div className="basis-[42%] shrink-0 bg-form-surface flex flex-col">
-          <div className="flex-1 flex items-center justify-center p-8">
+        <div className="basis-[42%] shrink-0 bg-form-surface flex flex-col min-h-0">
+          <div className="flex-1 min-h-0 flex items-center justify-center p-8 overflow-hidden">
             {svgUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img

@@ -92,7 +92,13 @@ export async function POST(req: Request) {
   }> = [];
 
   for (const item of order.line_items) {
-    const printUrl = findProp(item.properties, "_print_file_url");
+    // New keys are "_Print file" and "_Preview" (Shopify auto-linkifies
+    // URL values in admin). Old keys "_print_file_url" / "_preview_url"
+    // are kept as fallback for any in-flight orders placed before the
+    // rename.
+    const printUrl =
+      findProp(item.properties, "_Print file") ??
+      findProp(item.properties, "_print_file_url");
     if (!printUrl) continue;
     designLines.push({
       lineItemId: item.id,
@@ -100,7 +106,10 @@ export async function POST(req: Request) {
       templateId: findProp(item.properties, "_template_id") ?? null,
       designType: findProp(item.properties, "_design_type") ?? null,
       printFileUrl: printUrl,
-      previewUrl: findProp(item.properties, "_preview_url") ?? null,
+      previewUrl:
+        findProp(item.properties, "_Preview") ??
+        findProp(item.properties, "_preview_url") ??
+        null,
     });
   }
 

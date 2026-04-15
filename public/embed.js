@@ -131,9 +131,13 @@
       function onMessage(e) {
         if (!e.data || e.data.type !== "DESIGN_READY" || !e.data.payload) return;
         var p = e.data.payload;
+        // Property keys starting with "_" are hidden from the customer in
+        // the cart and order confirmation, but are visible to admins on the
+        // order page. Shopify auto-linkifies URL values, so admins get
+        // clickable Preview + Print file links on the line item.
         var properties = {
-          _print_file_url: p.printUrl,
-          _preview_url: p.previewUrl,
+          "_Print file": p.printUrl,
+          "_Preview": p.previewUrl,
           _template_id: p.templateId,
           _design_type: p.designType,
         };
