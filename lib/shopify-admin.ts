@@ -404,6 +404,51 @@ export async function configureDefaultVariant(
   }
 }
 
+// Products created via the Admin API are NOT auto-published to sales
+// channels — `status: ACTIVE` only marks the product as active. Manual
+// admin creates publish to every channel by default; we replicate that
+// by listing all publications and calling publishablePublish for each.
+export async function publishProductToAllChannels(
+  productGid: string
+): Promise<void> {
+  const data = await adminFetch<{
+    publications: { edges: Array<{ node: { id: string; name: string } }> };
+  }>(
+    `query ListPublications {
+       publications(first: 25) {
+         edges { node { id name } }
+       }
+     }`
+  );
+
+  const pubs = data.publications.edges.map((e) => e.node);
+  if (!pubs.length) return;
+
+  const result = await adminFetch<{
+    publishablePublish: {
+      userErrors: Array<{ field: string[]; message: string }>;
+    };
+  }>(
+    `mutation Publish($id: ID!, $input: [PublicationInput!]!) {
+       publishablePublish(id: $id, input: $input) {
+         userErrors { field message }
+       }
+     }`,
+    {
+      id: productGid,
+      input: pubs.map((p) => ({ publicationId: p.id })),
+    }
+  );
+
+  if (result.publishablePublish.userErrors.length) {
+    throw new Error(
+      `publishablePublish failed: ${result.publishablePublish.userErrors
+        .map((e) => `${e.field?.join(".")}: ${e.message}`)
+        .join("; ")}`
+    );
+  }
+}
+
 // Shopify rejects product images larger than 20 MB or 5000x5000 px. We pass
 // the image as a base64 string via productCreateMedia with a staged upload.
 // Simpler approach: use the REST products/:id/images endpoint which accepts

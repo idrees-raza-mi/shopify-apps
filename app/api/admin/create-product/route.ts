@@ -4,6 +4,7 @@ import {
   configureDefaultVariant,
   createProduct,
   findProductByTitle,
+  publishProductToAllChannels,
   setProductMetafield,
   uploadProductImage,
 } from "@/lib/shopify-admin";
@@ -83,6 +84,12 @@ export async function POST(req: Request) {
       await configureDefaultVariant(created.numericVariantId, priceGbp);
     } catch (e) {
       console.warn("configureDefaultVariant failed", e);
+    }
+
+    try {
+      await publishProductToAllChannels(created.productId);
+    } catch (e) {
+      console.warn("publishProductToAllChannels failed", e);
     }
 
     let imageError: string | null = null;
