@@ -52,18 +52,18 @@ export function DashboardClient({ items, source }: Props) {
   }, [items, tab, statusFilter, search]);
 
   return (
-    <div className="px-10 pt-10 pb-16 min-w-[1080px]">
+    <div className="px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 lg:pt-10 pb-16">
       {/* Header */}
-      <div className="flex items-start justify-between gap-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
         <div>
-          <h1 className="font-serif-display text-[34px] leading-tight text-[#1a1a1a]">
+          <h1 className="font-serif-display text-[26px] sm:text-[30px] lg:text-[34px] leading-tight text-[#1a1a1a]">
             Templates &amp; Canvases
           </h1>
           <p className="mt-1 text-[13px] text-text-muted">
             Manage your premade templates and custom canvas designs
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/admin/builder?tab=svg"
             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-card-border bg-white text-[13px] hover:bg-form-surface"
@@ -87,7 +87,7 @@ export function DashboardClient({ items, source }: Props) {
       )}
 
       {/* Stats */}
-      <div className="mt-7 grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="mt-7 grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         <StatCard label="Total Templates" value={stats.templates} />
         <StatCard label="Custom Canvases" value={stats.canvases} />
         <StatCard label="Published" value={stats.published} />
@@ -95,7 +95,7 @@ export function DashboardClient({ items, source }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="mt-9 border-b border-card-border flex items-center gap-7">
+      <div className="mt-9 border-b border-card-border flex items-center gap-5 sm:gap-7 overflow-x-auto">
         <TabButton active={tab === "templates"} onClick={() => setTab("templates")}>
           Premade Templates
         </TabButton>
@@ -105,8 +105,8 @@ export function DashboardClient({ items, source }: Props) {
       </div>
 
       {/* Toolbar */}
-      <div className="mt-5 flex items-center gap-3">
-        <div className="relative flex-1 max-w-md">
+      <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative flex-1 sm:max-w-md">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
             <SearchIcon size={16} />
           </span>
@@ -135,7 +135,7 @@ export function DashboardClient({ items, source }: Props) {
       </div>
 
       {/* Cards grid */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
         {visible.length === 0 && (
           <div className="col-span-full bg-white border border-dashed border-card-border rounded-card px-8 py-14 text-center text-[13px] text-text-muted">
             {items.length === 0 ? (
