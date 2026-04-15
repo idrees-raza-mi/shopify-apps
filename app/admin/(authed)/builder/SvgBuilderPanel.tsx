@@ -1,9 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { SVGUploader } from "@/components/admin/SVGUploader";
 import { SVGValidator } from "@/components/admin/SVGValidator";
 import { PermissionEditor } from "@/components/admin/PermissionEditor";
+import {
+  CreateProductModal,
+  type CreateProductSuccess,
+} from "@/components/admin/CreateProductModal";
 import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/Spinner";
 import type { SvgValidation } from "@/lib/svg-parser";
@@ -13,18 +18,26 @@ import { CopyIcon } from "@/components/admin/Icons";
 
 type Permissions = Record<string, ElementPermission>;
 
+function svgTextToDataUrl(svgText: string): string {
+  try {
+    const base64 = btoa(unescape(encodeURIComponent(svgText)));
+    return `data:image/svg+xml;base64,${base64}`;
+  } catch {
+    return "";
+  }
+}
+
 export function SvgBuilderPanel() {
   const toast = useToast();
+  const router = useRouter();
 
   const [fileName, setFileName] = useState<string | null>(null);
   const [svgText, setSvgText] = useState<string>("");
   const [validation, setValidation] = useState<SvgValidation | null>(null);
   const [permissions, setPermissions] = useState<Permissions>({});
 
-  const [productName, setProductName] = useState("");
-  const [price, setPrice] = useState("£29.99");
-  const [productId, setProductId] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const handleLoaded = ({
     fileName,
@@ -38,7 +51,6 @@ export function SvgBuilderPanel() {
     setFileName(fileName);
     setSvgText(svgText);
     setValidation(validation);
-    // Initialize permissions: every element starts LOCKED.
     const initial: Permissions = {};
     for (const el of validation.elements) {
       initial[el.id] = {
@@ -50,23 +62,28 @@ export function SvgBuilderPanel() {
     setPermissions(initial);
   };
 
-  const config: TemplateConfig | null = useMemo(() => {
+  const buildConfig = (productName: string, priceLabel: string): TemplateConfig | null => {
     if (!validation?.valid) return null;
     return {
       type: "template",
       templateId: `tpl_${Date.now().toString(36)}`,
-      productName: productName || "Untitled Template",
-      svgUrl: "", // filled in on save
+      productName,
+      svgUrl: "",
       canvasWidth: Math.round(validation.width),
       canvasHeight: Math.round(validation.height),
       permissions,
-      price,
+      price: priceLabel,
       status: "published",
       createdAt: new Date().toISOString().slice(0, 10),
     };
-  }, [validation, productName, price, permissions]);
+  };
 
-  const json = config ? JSON.stringify(config, null, 2) : "";
+  const previewConfig = useMemo(
+    () => buildConfig("Untitled Template", "£0"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [validation, permissions]
+  );
+  const json = previewConfig ? JSON.stringify(previewConfig, null, 2) : "";
 
   const copyJson = async () => {
     if (!json) return;
@@ -78,22 +95,29 @@ export function SvgBuilderPanel() {
     }
   };
 
-  const handleSave = async () => {
+  const previewInEditor = () => {
+    if (!previewConfig) return;
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(previewConfig))));
+    window.open(`/editor/preview?config=${encoded}`, "_blank");
+  };
+
+  const openCreateModal = () => {
     if (!validation?.valid || !svgText) {
       toast.show("Upload a valid SVG first");
       return;
     }
-    if (!productName.trim()) {
-      toast.show("Template name is required");
-      return;
-    }
-    if (!productId.trim()) {
-      toast.show("Shopify Product ID is required");
-      return;
-    }
-    setSaving(true);
+    setModalOpen(true);
+  };
+
+  const handleCreate = async (fields: {
+    title: string;
+    description: string;
+    priceGbp: number;
+    imageDataUrl: string | null;
+  }): Promise<CreateProductSuccess | { error: string }> => {
+    setPublishing(true);
     try {
-      // 1) upload SVG
+      // 1) upload SVG to Cloudinary
       const fd = new FormData();
       fd.append(
         "file",
@@ -101,34 +125,58 @@ export function SvgBuilderPanel() {
       );
       const upRes = await fetch("/api/admin/upload-svg", { method: "POST", body: fd });
       const upJson = await upRes.json();
-      if (!upRes.ok) throw new Error(upJson.error ?? "Upload failed");
+      if (!upRes.ok) return { error: upJson.error ?? "SVG upload failed" };
 
-      // 2) save metafield
-      const finalConfig: TemplateConfig = {
-        ...config!,
-        svgUrl: upJson.svgUrl,
-      };
-      const saveRes = await fetch("/api/admin/save-template", {
+      // 2) build config using modal fields
+      const config = buildConfig(fields.title, `£${fields.priceGbp.toFixed(2)}`);
+      if (!config) return { error: "Invalid SVG validation state" };
+      const finalConfig: TemplateConfig = { ...config, svgUrl: upJson.svgUrl };
+
+      // 3) create Shopify product + write metafield
+      const createRes = await fetch("/api/admin/create-product", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: productId.trim(), config: finalConfig }),
+        body: JSON.stringify({
+          kind: "template",
+          title: fields.title,
+          description: fields.description,
+          priceGbp: fields.priceGbp,
+          imageDataUrl: fields.imageDataUrl,
+          config: finalConfig,
+        }),
       });
-      const saveJson = await saveRes.json();
-      if (!saveRes.ok) throw new Error(saveJson.error ?? "Save failed");
+      const createJson = await createRes.json();
+      if (!createRes.ok) {
+        return { error: createJson.message ?? createJson.error ?? "Create failed" };
+      }
 
-      toast.show("Template published to Shopify");
+      const success: CreateProductSuccess = {
+        productId: createJson.productId,
+        title: createJson.title,
+        adminUrl: createJson.adminUrl,
+        imageError: createJson.imageError ?? null,
+      };
+
+      const msg = success.imageError
+        ? `Created "${success.title}" — image failed: ${success.imageError}`
+        : `Created "${success.title}" in Shopify`;
+      toast.show({
+        message: msg,
+        actions: [
+          { label: "View in Shopify", href: success.adminUrl },
+          { label: "Dashboard", onClick: () => router.push("/admin/dashboard") },
+        ],
+      });
+
+      return success;
     } catch (e) {
-      toast.show(e instanceof Error ? e.message : "Save failed");
+      return { error: e instanceof Error ? e.message : "Create failed" };
     } finally {
-      setSaving(false);
+      setPublishing(false);
     }
   };
 
-  const previewInEditor = () => {
-    if (!config) return;
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(config))));
-    window.open(`/editor/preview?config=${encoded}`, "_blank");
-  };
+  const svgDataUrl = svgText ? svgTextToDataUrl(svgText) : "";
 
   return (
     <div className="flex min-h-[calc(100vh-180px)]">
@@ -155,36 +203,18 @@ export function SvgBuilderPanel() {
 
         {validation?.valid && (
           <div className="border-t border-card-border pt-5 space-y-3">
-            <div className="text-[10px] tracking-[0.16em] uppercase text-text-muted">
-              Product details
-            </div>
-            <Field
-              label="Template name"
-              value={productName}
-              onChange={setProductName}
-              placeholder="e.g. Happy Birthday Princess"
-            />
-            <Field
-              label="Price"
-              value={price}
-              onChange={setPrice}
-              placeholder="£29.99"
-            />
-            <Field
-              label="Shopify Product ID"
-              value={productId}
-              onChange={setProductId}
-              placeholder="paste from Shopify admin URL"
-            />
             <button
               type="button"
-              onClick={handleSave}
-              disabled={saving}
+              onClick={openCreateModal}
+              disabled={publishing}
               className="w-full h-11 rounded-lg bg-gold hover:bg-gold-hover text-white text-[13px] font-semibold tracking-[0.02em] disabled:opacity-60 inline-flex items-center justify-center gap-2"
             >
-              {saving && <Spinner size={14} />}
-              {saving ? "Saving…" : "Save & Publish to Shopify"}
+              {publishing && <Spinner size={14} />}
+              {publishing ? "Creating…" : "Create Shopify product"}
             </button>
+            <p className="text-[10px] text-text-muted leading-relaxed text-center">
+              Enter product details in the next step.
+            </p>
           </div>
         )}
       </div>
@@ -196,10 +226,12 @@ export function SvgBuilderPanel() {
             SVG preview
           </div>
           <div className="bg-white border border-card-border rounded-card p-6 flex items-center justify-center min-h-[300px]">
-            {svgText ? (
-              <div
-                className="max-w-full max-h-[380px] [&>svg]:max-w-full [&>svg]:max-h-[380px]"
-                dangerouslySetInnerHTML={{ __html: svgText }}
+            {svgDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={svgDataUrl}
+                alt="uploaded SVG preview"
+                className="max-w-full max-h-[380px] object-contain"
               />
             ) : (
               <div className="text-[12px] text-text-muted">
@@ -226,7 +258,7 @@ export function SvgBuilderPanel() {
               <button
                 type="button"
                 onClick={previewInEditor}
-                disabled={!config}
+                disabled={!previewConfig}
                 className="inline-flex items-center h-8 px-3 rounded-md bg-[#1a1a1a] text-white text-[11px] hover:bg-black disabled:opacity-50"
               >
                 Preview in Editor
@@ -238,31 +270,12 @@ export function SvgBuilderPanel() {
           </pre>
         </div>
       </div>
-    </div>
-  );
-}
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <label className="block">
-      <div className="text-[11px] text-text-muted mb-1">{label}</div>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full h-10 px-3 rounded-lg border border-card-border bg-form-surface text-[13px] focus:outline-none focus:ring-2 focus:ring-gold/40"
+      <CreateProductModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSubmit={handleCreate}
       />
-    </label>
+    </div>
   );
 }

@@ -13,7 +13,7 @@ type StatusFilter = "all" | "published" | "draft";
 
 type Props = {
   items: DashboardItem[];
-  source: "shopify" | "mock";
+  source: "shopify" | "empty";
 };
 
 export function DashboardClient({ items, source }: Props) {
@@ -79,10 +79,10 @@ export function DashboardClient({ items, source }: Props) {
         </div>
       </div>
 
-      {source === "mock" && (
-        <div className="mt-5 inline-flex items-center gap-2 text-[12px] text-[#a06b1c] bg-[#fdf3e1] border border-[#f1ddb3] rounded-md px-3 py-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#a06b1c]" />
-          Showing mock data — connect Shopify env vars to load real metafields.
+      {source === "empty" && items.length === 0 && (
+        <div className="mt-5 inline-flex items-center gap-2 text-[12px] text-text-muted bg-form-surface border border-card-border rounded-md px-3 py-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-text-muted" />
+          Could not reach Shopify — check env vars or try again.
         </div>
       )}
 
@@ -138,7 +138,20 @@ export function DashboardClient({ items, source }: Props) {
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {visible.length === 0 && (
           <div className="col-span-full bg-white border border-dashed border-card-border rounded-card px-8 py-14 text-center text-[13px] text-text-muted">
-            No {tab === "templates" ? "templates" : "canvases"} match your filters.
+            {items.length === 0 ? (
+              <>
+                No {tab === "templates" ? "templates" : "canvases"} yet — create one from the{" "}
+                <Link
+                  href={tab === "templates" ? "/admin/builder?tab=svg" : "/admin/builder?tab=canvas"}
+                  className="underline hover:text-[#1a1a1a]"
+                >
+                  builder
+                </Link>
+                .
+              </>
+            ) : (
+              <>No {tab === "templates" ? "templates" : "canvases"} match your filters.</>
+            )}
           </div>
         )}
         {visible.map((item) => (

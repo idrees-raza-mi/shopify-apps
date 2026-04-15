@@ -53,6 +53,11 @@ function toGid(kind: "Product" | "Order", id: string): string {
   return `gid://shopify/${kind}/${id}`;
 }
 
+function numericFromGid(gid: string): string {
+  const m = gid.match(/\/(\d+)(?:\?.*)?$/);
+  return m ? m[1] : gid;
+}
+
 // =====================================================
 // Metafield helpers
 // =====================================================
@@ -263,4 +268,164 @@ export async function listProductsWithMetafield(
   }
 
   return out;
+}
+
+// =====================================================
+// Product create flow (used by admin builder)
+// =====================================================
+
+export async function findProductByTitle(
+  title: string
+): Promise<{ productId: string; numericId: string; title: string } | null> {
+  const escaped = title.replace(/"/g, '\\"');
+  const data = await adminFetch<{
+    products: { edges: Array<{ node: { id: string; title: string } }> };
+  }>(
+    `query FindProductByTitle($query: String!) {
+       products(first: 5, query: $query) {
+         edges { node { id title } }
+       }
+     }`,
+    { query: `title:"${escaped}"` }
+  );
+  const match = data.products.edges.find(
+    (e) => e.node.title.toLowerCase() === title.toLowerCase()
+  );
+  if (!match) return null;
+  return {
+    productId: match.node.id,
+    numericId: numericFromGid(match.node.id),
+    title: match.node.title,
+  };
+}
+
+export type CreateProductInput = {
+  title: string;
+  descriptionHtml?: string;
+  priceGbp: number;
+};
+
+export type CreateProductResult = {
+  productId: string;
+  numericId: string;
+  defaultVariantId: string;
+  numericVariantId: string;
+  adminUrl: string;
+};
+
+export async function createProduct(
+  input: CreateProductInput
+): Promise<CreateProductResult> {
+  const data = await adminFetch<{
+    productCreate: {
+      product: {
+        id: string;
+        variants: { edges: Array<{ node: { id: string } }> };
+      } | null;
+      userErrors: Array<{ field: string[]; message: string }>;
+    };
+  }>(
+    `mutation CreateProduct($input: ProductInput!) {
+       productCreate(input: $input) {
+         product {
+           id
+           variants(first: 1) { edges { node { id } } }
+         }
+         userErrors { field message }
+       }
+     }`,
+    {
+      input: {
+        title: input.title,
+        descriptionHtml: input.descriptionHtml ?? "",
+        status: "ACTIVE",
+        published: true,
+        variants: [{ price: input.priceGbp.toFixed(2) }],
+      },
+    }
+  );
+
+  if (data.productCreate.userErrors.length || !data.productCreate.product) {
+    throw new Error(
+      `productCreate failed: ${data.productCreate.userErrors
+        .map((e) => `${e.field?.join(".")}: ${e.message}`)
+        .join("; ")}`
+    );
+  }
+
+  const product = data.productCreate.product;
+  const variantEdge = product.variants.edges[0];
+  if (!variantEdge) {
+    throw new Error("productCreate returned product with no default variant");
+  }
+
+  const numericProductId = numericFromGid(product.id);
+  const numericVariantId = numericFromGid(variantEdge.node.id);
+
+  return {
+    productId: product.id,
+    numericId: numericProductId,
+    defaultVariantId: variantEdge.node.id,
+    numericVariantId,
+    adminUrl: `https://${STORE}/admin/products/${numericProductId}`,
+  };
+}
+
+export async function disableVariantInventory(
+  numericVariantId: string
+): Promise<void> {
+  const res = await fetch(
+    `https://${STORE}/admin/api/${VERSION}/variants/${numericVariantId}.json`,
+    {
+      method: "PUT",
+      headers: {
+        "X-Shopify-Access-Token": TOKEN,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        variant: {
+          id: Number(numericVariantId),
+          inventory_management: null,
+          inventory_policy: "continue",
+        },
+      }),
+      cache: "no-store",
+    }
+  );
+  if (!res.ok) {
+    throw new Error(
+      `disableVariantInventory ${numericVariantId}: HTTP ${res.status} ${await res.text()}`
+    );
+  }
+}
+
+// Shopify rejects product images larger than 20 MB or 5000x5000 px. We pass
+// the image as a base64 string via productCreateMedia with a staged upload.
+// Simpler approach: use the REST products/:id/images endpoint which accepts
+// base64-encoded attachments directly.
+export async function uploadProductImage(
+  numericProductId: string,
+  base64: string,
+  filename: string
+): Promise<void> {
+  const res = await fetch(
+    `https://${STORE}/admin/api/${VERSION}/products/${numericProductId}/images.json`,
+    {
+      method: "POST",
+      headers: {
+        "X-Shopify-Access-Token": TOKEN,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        image: { attachment: base64, filename },
+      }),
+      cache: "no-store",
+    }
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`uploadProductImage HTTP ${res.status}: ${text}`);
+  }
 }

@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/Spinner";
 import { CopyIcon } from "@/components/admin/Icons";
+import {
+  CreateProductModal,
+  type CreateProductSuccess,
+} from "@/components/admin/CreateProductModal";
 import type { CanvasConfig } from "@/lib/types";
 
 export function CanvasBuilderPanel() {
   const toast = useToast();
-
-  const [productName, setProductName] = useState("");
-  const [price, setPrice] = useState("£89.99");
-  const [productId, setProductId] = useState("");
+  const router = useRouter();
 
   const [printWidthCm, setPrintWidthCm] = useState(100);
   const [printHeightCm, setPrintHeightCm] = useState(150);
@@ -21,34 +23,29 @@ export function CanvasBuilderPanel() {
   const [displayW, setDisplayW] = useState(380);
   const [displayH, setDisplayH] = useState(500);
 
-  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  const buildConfig = (productName: string, priceLabel: string): CanvasConfig => ({
+    type: "canvas",
+    templateId: `cnv_${Date.now().toString(36)}`,
+    productName,
+    shape: "rect",
+    displayW,
+    displayH,
+    printWidthCm,
+    printHeightCm,
+    bleedPx,
+    safePx,
+    price: priceLabel,
+    status: "published",
+    createdAt: new Date().toISOString().slice(0, 10),
+  });
 
   const config: CanvasConfig = useMemo(
-    () => ({
-      type: "canvas",
-      templateId: `cnv_${Date.now().toString(36)}`,
-      productName: productName || "Untitled Canvas",
-      shape: "rect",
-      displayW,
-      displayH,
-      printWidthCm,
-      printHeightCm,
-      bleedPx,
-      safePx,
-      price,
-      status: "published",
-      createdAt: new Date().toISOString().slice(0, 10),
-    }),
-    [
-      productName,
-      price,
-      displayW,
-      displayH,
-      printWidthCm,
-      printHeightCm,
-      bleedPx,
-      safePx,
-    ]
+    () => buildConfig("Untitled Canvas", "£0"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayW, displayH, printWidthCm, printHeightCm, bleedPx, safePx]
   );
 
   const json = JSON.stringify(config, null, 2);
@@ -67,29 +64,52 @@ export function CanvasBuilderPanel() {
     window.open(`/editor/preview?config=${encoded}`, "_blank");
   };
 
-  const handleSave = async () => {
-    if (!productName.trim()) {
-      toast.show("Product name is required");
-      return;
-    }
-    if (!productId.trim()) {
-      toast.show("Shopify Product ID is required");
-      return;
-    }
-    setSaving(true);
+  const handleCreate = async (fields: {
+    title: string;
+    description: string;
+    priceGbp: number;
+    imageDataUrl: string | null;
+  }): Promise<CreateProductSuccess | { error: string }> => {
+    setPublishing(true);
     try {
-      const res = await fetch("/api/admin/save-canvas", {
+      const finalConfig = buildConfig(fields.title, `£${fields.priceGbp.toFixed(2)}`);
+      const createRes = await fetch("/api/admin/create-product", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: productId.trim(), config }),
+        body: JSON.stringify({
+          kind: "canvas",
+          title: fields.title,
+          description: fields.description,
+          priceGbp: fields.priceGbp,
+          imageDataUrl: fields.imageDataUrl,
+          config: finalConfig,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Save failed");
-      toast.show("Canvas published to Shopify");
+      const createJson = await createRes.json();
+      if (!createRes.ok) {
+        return { error: createJson.message ?? createJson.error ?? "Create failed" };
+      }
+      const success: CreateProductSuccess = {
+        productId: createJson.productId,
+        title: createJson.title,
+        adminUrl: createJson.adminUrl,
+        imageError: createJson.imageError ?? null,
+      };
+      const msg = success.imageError
+        ? `Created "${success.title}" — image failed: ${success.imageError}`
+        : `Created "${success.title}" in Shopify`;
+      toast.show({
+        message: msg,
+        actions: [
+          { label: "View in Shopify", href: success.adminUrl },
+          { label: "Dashboard", onClick: () => router.push("/admin/dashboard") },
+        ],
+      });
+      return success;
     } catch (e) {
-      toast.show(e instanceof Error ? e.message : "Save failed");
+      return { error: e instanceof Error ? e.message : "Create failed" };
     } finally {
-      setSaving(false);
+      setPublishing(false);
     }
   };
 
@@ -97,17 +117,6 @@ export function CanvasBuilderPanel() {
     <div className="flex min-h-[calc(100vh-180px)]">
       {/* LEFT — 360px form column */}
       <div className="w-[360px] shrink-0 bg-white border-r border-card-border overflow-y-auto p-6 space-y-6">
-        <Card title="Product info">
-          <Field label="Product name" value={productName} onChange={setProductName} placeholder="Rectangle Canvas Print" />
-          <Field label="Price" value={price} onChange={setPrice} placeholder="£89.99" />
-          <Field
-            label="Shopify Product ID"
-            value={productId}
-            onChange={setProductId}
-            placeholder="paste from Shopify admin URL"
-          />
-        </Card>
-
         <Card title="Print dimensions">
           <div className="grid grid-cols-2 gap-3">
             <NumberField label="Width (cm)" value={printWidthCm} onChange={setPrintWidthCm} min={1} />
@@ -133,13 +142,16 @@ export function CanvasBuilderPanel() {
 
         <button
           type="button"
-          onClick={handleSave}
-          disabled={saving}
+          onClick={() => setModalOpen(true)}
+          disabled={publishing}
           className="w-full h-11 rounded-lg bg-gold hover:bg-gold-hover text-white text-[13px] font-semibold tracking-[0.02em] disabled:opacity-60 inline-flex items-center justify-center gap-2"
         >
-          {saving && <Spinner size={14} />}
-          {saving ? "Saving…" : "Save & Publish to Shopify"}
+          {publishing && <Spinner size={14} />}
+          {publishing ? "Creating…" : "Create Shopify product"}
         </button>
+        <p className="text-[10px] text-text-muted leading-relaxed text-center -mt-2">
+          Enter product details in the next step.
+        </p>
       </div>
 
       {/* RIGHT — preview + JSON */}
@@ -185,6 +197,12 @@ export function CanvasBuilderPanel() {
           </pre>
         </div>
       </div>
+
+      <CreateProductModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSubmit={handleCreate}
+      />
     </div>
   );
 }
@@ -274,31 +292,6 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
       </div>
       <div className="space-y-3">{children}</div>
     </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <label className="block">
-      <div className="text-[11px] text-text-muted mb-1">{label}</div>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full h-10 px-3 rounded-lg border border-card-border bg-form-surface text-[13px] focus:outline-none focus:ring-2 focus:ring-gold/40"
-      />
-    </label>
   );
 }
 

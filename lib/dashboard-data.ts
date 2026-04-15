@@ -1,17 +1,16 @@
 import { listProductsWithMetafield } from "./shopify-admin";
-import { MOCK_DASHBOARD_ITEMS } from "./mock-data";
 import type { AnyConfig, DashboardItem } from "./types";
 
 /**
  * Server-side loader for the admin dashboard.
  *
- * Tries to read template_config and canvas_config metafields from Shopify.
- * Falls back to mock data if Shopify env vars are not configured or the
- * request fails (so the dashboard is testable before real credentials land).
+ * Reads template_config and canvas_config metafields from Shopify products.
+ * Returns an empty list if Shopify has no matching products (the dashboard
+ * renders a "No products yet" empty state) or if the request fails entirely.
  */
 export async function loadDashboardItems(): Promise<{
   items: DashboardItem[];
-  source: "shopify" | "mock";
+  source: "shopify" | "empty";
 }> {
   try {
     const [templates, canvases] = await Promise.all([
@@ -33,11 +32,8 @@ export async function loadDashboardItems(): Promise<{
       }
     }
 
-    if (items.length === 0) {
-      return { items: MOCK_DASHBOARD_ITEMS, source: "mock" };
-    }
     return { items, source: "shopify" };
   } catch {
-    return { items: MOCK_DASHBOARD_ITEMS, source: "mock" };
+    return { items: [], source: "empty" };
   }
 }
