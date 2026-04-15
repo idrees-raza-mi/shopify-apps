@@ -248,9 +248,10 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
     // ZOOM_FEATURE_START
     <div
       ref={zoomContainerRef}
-      className={`w-full h-full flex items-center justify-center ${
+      className={`w-full h-full flex ${
         zoom.isOverflowing ? "overflow-auto" : "overflow-hidden"
       }`}
+      style={{ alignItems: "safe center", justifyContent: "safe center" }}
     >
       {loadError ? (
         <div className="text-[12px] text-text-muted text-center">

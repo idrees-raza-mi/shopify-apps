@@ -480,9 +480,10 @@ export function FreeEditor({ config }: { config: CanvasConfig }) {
     // ZOOM_FEATURE_START
     <div
       ref={zoomContainerRef}
-      className={`w-full h-full flex items-center justify-center ${
+      className={`w-full h-full flex ${
         zoom.isOverflowing ? "overflow-auto" : "overflow-hidden"
       }`}
+      style={{ alignItems: "safe center", justifyContent: "safe center" }}
     >
       <div ref={zoomOuterRef} className="relative shrink-0">
         <div
