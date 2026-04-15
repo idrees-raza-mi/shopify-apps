@@ -6,6 +6,7 @@ import { EditorShell } from "./EditorShell";
 import { useToast } from "@/components/Toast";
 import type { TemplateConfig } from "@/lib/types";
 import { handoffDesign } from "@/lib/cart-client";
+import { googleFontsHrefFor } from "@/lib/google-fonts";
 // ZOOM_FEATURE_START
 import { useCanvasZoom } from "@/hooks/useCanvasZoom";
 import { ZoomControls } from "./ZoomControls";
@@ -44,6 +45,23 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+
+  // Inject a single Google Fonts <link> tag covering every font detected
+  // in the SVG at upload time. Without this, browsers fall back to
+  // their default font for editable text and the design looks broken.
+  useEffect(() => {
+    const fonts = config.requiredFonts ?? [];
+    const href = googleFontsHrefFor(fonts);
+    if (!href) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.dataset.eventBestiesFonts = "1";
+    document.head.appendChild(link);
+    return () => {
+      link.remove();
+    };
+  }, [config.requiredFonts]);
 
   const [textValues, setTextValues] = useState<Record<string, string>>({});
   const [colorValues, setColorValues] = useState<Record<string, string>>({});
@@ -155,6 +173,7 @@ export function TemplateEditor({ config }: { config: TemplateConfig }) {
           svgString,
           canvasWidth: config.canvasWidth,
           canvasHeight: config.canvasHeight,
+          fonts: config.requiredFonts ?? [],
         }),
       });
       const data = await res.json();
