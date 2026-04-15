@@ -52,7 +52,7 @@ export function DashboardClient({ items, source }: Props) {
   }, [items, tab, statusFilter, search]);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 lg:pt-10 pb-16">
+    <div className="px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 lg:pt-10 pb-16 max-w-[1500px] mx-auto w-full">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
         <div>
@@ -134,8 +134,8 @@ export function DashboardClient({ items, source }: Props) {
         </div>
       </div>
 
-      {/* Cards grid */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+      {/* Cards grid: auto-fill keeps cards at a comfortable size on huge screens */}
+      <div className="mt-6 grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
         {visible.length === 0 && (
           <div className="col-span-full bg-white border border-dashed border-card-border rounded-card px-8 py-14 text-center text-[13px] text-text-muted">
             {items.length === 0 ? (
