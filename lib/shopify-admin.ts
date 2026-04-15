@@ -313,6 +313,10 @@ export type CreateProductResult = {
   adminUrl: string;
 };
 
+// Shopify dropped the `variants` field from ProductInput in 2024-07+. We
+// create the product without variant details — Shopify auto-creates a
+// single default variant at price 0 — then configure that variant via the
+// REST variants endpoint (price + inventory policy) in one call.
 export async function createProduct(
   input: CreateProductInput
 ): Promise<CreateProductResult> {
@@ -339,8 +343,6 @@ export async function createProduct(
         title: input.title,
         descriptionHtml: input.descriptionHtml ?? "",
         status: "ACTIVE",
-        published: true,
-        variants: [{ price: input.priceGbp.toFixed(2) }],
       },
     }
   );
@@ -371,8 +373,9 @@ export async function createProduct(
   };
 }
 
-export async function disableVariantInventory(
-  numericVariantId: string
+export async function configureDefaultVariant(
+  numericVariantId: string,
+  priceGbp: number
 ): Promise<void> {
   const res = await fetch(
     `https://${STORE}/admin/api/${VERSION}/variants/${numericVariantId}.json`,
@@ -386,6 +389,7 @@ export async function disableVariantInventory(
       body: JSON.stringify({
         variant: {
           id: Number(numericVariantId),
+          price: priceGbp.toFixed(2),
           inventory_management: null,
           inventory_policy: "continue",
         },
@@ -395,7 +399,7 @@ export async function disableVariantInventory(
   );
   if (!res.ok) {
     throw new Error(
-      `disableVariantInventory ${numericVariantId}: HTTP ${res.status} ${await res.text()}`
+      `configureDefaultVariant ${numericVariantId}: HTTP ${res.status} ${await res.text()}`
     );
   }
 }

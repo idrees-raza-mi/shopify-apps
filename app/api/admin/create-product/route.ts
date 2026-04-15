@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import {
+  configureDefaultVariant,
   createProduct,
-  disableVariantInventory,
   findProductByTitle,
   setProductMetafield,
   uploadProductImage,
@@ -71,16 +71,18 @@ export async function POST(req: Request) {
       );
     }
 
+    const priceGbp = typeof body.priceGbp === "number" ? body.priceGbp : 0;
+
     const created = await createProduct({
       title,
       descriptionHtml: body.description?.trim() || "",
-      priceGbp: typeof body.priceGbp === "number" ? body.priceGbp : 0,
+      priceGbp,
     });
 
     try {
-      await disableVariantInventory(created.numericVariantId);
+      await configureDefaultVariant(created.numericVariantId, priceGbp);
     } catch (e) {
-      console.warn("disableVariantInventory failed", e);
+      console.warn("configureDefaultVariant failed", e);
     }
 
     let imageError: string | null = null;
