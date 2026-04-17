@@ -17,7 +17,6 @@ type ExportBody = {
   displayH?: number;
   printWidthCm?: number;
   printHeightCm?: number;
-  fonts?: string[];
 };
 
 /**
@@ -52,8 +51,7 @@ export async function POST(req: Request) {
       pngBuffer = await renderTemplateSVG(
         body.svgString,
         body.canvasWidth ?? 800,
-        body.canvasHeight ?? 1010,
-        body.fonts
+        body.canvasHeight ?? 1010
       );
     } else {
       if (!body.fabricJSON) {
