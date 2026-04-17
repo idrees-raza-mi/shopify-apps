@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { uploadSVG } from "@/lib/cloudinary";
-import { embedFonts } from "@/lib/embed-fonts";
 
 export const runtime = "nodejs";
 
@@ -26,14 +25,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "File must be an .svg" }, { status: 400 });
   }
 
-  let text = await file.text();
+  const text = await file.text();
   if (!text.includes("<svg")) {
     return NextResponse.json({ error: "File does not look like an SVG" }, { status: 400 });
   }
-
-  // Embed Google Fonts as base64 @font-face rules directly into the SVG.
-  // This makes the file self-contained — no runtime CDN dependency.
-  text = await embedFonts(text);
 
   const buffer = Buffer.from(text, "utf-8");
   const publicId = `tpl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
