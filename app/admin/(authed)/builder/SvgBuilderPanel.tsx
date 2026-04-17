@@ -13,6 +13,7 @@ import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/Spinner";
 import type { SvgValidation } from "@/lib/svg-parser";
 import { deriveLabel } from "@/lib/svg-parser";
+import { checkFonts } from "@/lib/google-fonts";
 import type { ElementPermission, TemplateConfig } from "@/lib/types";
 import { CopyIcon } from "@/components/admin/Icons";
 
@@ -75,8 +76,15 @@ export function SvgBuilderPanel() {
       price: priceLabel,
       status: "published",
       createdAt: new Date().toISOString().slice(0, 10),
+      requiredFonts: validation.fonts,
     };
   };
+
+  const fontChecks = useMemo(
+    () => (validation?.fonts ? checkFonts(validation.fonts) : []),
+    [validation?.fonts]
+  );
+  const missingFonts = fontChecks.filter((c) => !c.available);
 
   const previewConfig = useMemo(
     () => buildConfig("Untitled Template", "£0"),
@@ -186,6 +194,44 @@ export function SvgBuilderPanel() {
 
         {validation && fileName && (
           <SVGValidator fileName={fileName} validation={validation} />
+        )}
+
+        {validation?.valid && fontChecks.length > 0 && (
+          <div>
+            <div className="text-[10px] tracking-[0.16em] uppercase text-text-muted mb-2">
+              Detected fonts
+            </div>
+            <div className="space-y-1.5">
+              {fontChecks.map((c) => (
+                <div
+                  key={c.family}
+                  className={`flex items-center gap-2 text-[12px] px-2.5 py-1.5 rounded-md border ${
+                    c.available
+                      ? "bg-[#e8f4ea] border-[#c9e2cf] text-[#2a7a3c]"
+                      : "bg-[#fdf3e1] border-[#f1ddb3] text-[#a06b1c]"
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      c.available ? "bg-[#2a7a3c]" : "bg-[#a06b1c]"
+                    }`}
+                  />
+                  <span className="flex-1 truncate">{c.family}</span>
+                  <span className="text-[10px] uppercase tracking-[0.06em] opacity-70">
+                    {c.available ? "Google Font" : "Not on Google"}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {missingFonts.length > 0 && (
+              <p className="text-[10px] text-text-muted mt-2 leading-relaxed">
+                Text using a non–Google Font will fall back to a default in
+                the customer editor. Pick a Google Font in Illustrator
+                (Pacifico, Bungee, Lobster…) or convert the text to outlines
+                to make it non-editable but pixel-perfect.
+              </p>
+            )}
+          </div>
         )}
 
         {validation?.valid && (

@@ -57,10 +57,20 @@ function clampScaleFactor(width: number, height: number, preferred = 3): number 
   return Math.max(1, Math.min(preferred, maxScale));
 }
 
+function googleFontsLinkTag(fonts: string[] | undefined): string {
+  if (!fonts || !fonts.length) return "";
+  const params = fonts
+    .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, "+")}:wght@400;700`)
+    .join("&");
+  const href = `https://fonts.googleapis.com/css2?${params}&display=block`;
+  return `<link rel="stylesheet" href="${href}">`;
+}
+
 export async function renderTemplateSVG(
   svgString: string,
   width: number,
-  height: number
+  height: number,
+  fonts?: string[]
 ): Promise<Buffer> {
   const browser = await launchBrowser();
   try {
@@ -70,11 +80,20 @@ export async function renderTemplateSVG(
       height: Math.max(1, Math.ceil(height)),
       deviceScaleFactor: clampScaleFactor(width, height),
     });
-    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    const fontLink = googleFontsLinkTag(fonts);
+    const html = `<!doctype html><html><head><meta charset="utf-8">${fontLink}<style>
 html,body{margin:0;padding:0;background:#ffffff;}
 svg{display:block;width:${width}px;height:${height}px;}
 </style></head><body>${svgString}</body></html>`;
     await page.setContent(html, { waitUntil: "networkidle0" });
+    // Wait until the browser confirms all @font-face downloads finished.
+    // Without this Puppeteer can race ahead and screenshot before the
+    // Google Font is applied, defeating the whole point.
+    if (fonts && fonts.length) {
+      await page.evaluate(() =>
+        (document as Document & { fonts: { ready: Promise<unknown> } }).fonts.ready
+      );
+    }
     const screenshot = await page.screenshot({
       type: "png",
       fullPage: false,

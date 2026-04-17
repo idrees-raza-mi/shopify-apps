@@ -22,7 +22,38 @@ export type SvgValidation = {
   elementCount: number;
   textElementCount: number;
   elements: SvgElementInfo[];
+  fonts: string[];
 };
+
+/**
+ * Parse a CSS font-family value into a list of clean font names.
+ * Strips quotes, splits on commas, filters generic keywords.
+ */
+function parseFontFamily(raw: string): string[] {
+  if (!raw) return [];
+  const generic = new Set([
+    "serif",
+    "sans-serif",
+    "monospace",
+    "cursive",
+    "fantasy",
+    "system-ui",
+    "ui-serif",
+    "ui-sans-serif",
+    "ui-monospace",
+    "ui-rounded",
+    "math",
+    "emoji",
+    "fangsong",
+    "inherit",
+    "initial",
+    "unset",
+  ]);
+  return raw
+    .split(",")
+    .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
+    .filter((s) => s.length > 0 && !generic.has(s.toLowerCase()));
+}
 
 const NON_VISUAL_TAGS = new Set([
   "defs",
@@ -62,6 +93,7 @@ export function parseSvg(svgText: string): SvgValidation {
       elementCount: 0,
       textElementCount: 0,
       elements: [],
+      fonts: [],
     };
   }
 
@@ -78,6 +110,7 @@ export function parseSvg(svgText: string): SvgValidation {
       elementCount: 0,
       textElementCount: 0,
       elements: [],
+      fonts: [],
     };
   }
 
@@ -92,6 +125,7 @@ export function parseSvg(svgText: string): SvgValidation {
       elementCount: 0,
       textElementCount: 0,
       elements: [],
+      fonts: [],
     };
   }
 
@@ -135,6 +169,34 @@ export function parseSvg(svgText: string): SvgValidation {
     });
   });
 
+  // Collect font-family values from every text/tspan element.
+  // Illustrator emits font-family in three places, so check all:
+  //   1. font-family attribute
+  //   2. inline style="font-family: ..."
+  //   3. <style> block referencing a class — handled by reading the
+  //      computed style of each element via getAttribute and the raw
+  //      <style> contents (regex parse for common cases)
+  const fontSet = new Set<string>();
+  doc.querySelectorAll("text, tspan").forEach((el) => {
+    const attr = el.getAttribute("font-family");
+    if (attr) parseFontFamily(attr).forEach((f) => fontSet.add(f));
+    const style = el.getAttribute("style");
+    if (style) {
+      const m = style.match(/font-family\s*:\s*([^;]+)/i);
+      if (m) parseFontFamily(m[1]).forEach((f) => fontSet.add(f));
+    }
+  });
+  // Also scan inline <style> blocks for font-family declarations —
+  // Illustrator commonly groups CSS into a single <style> element.
+  doc.querySelectorAll("style").forEach((styleEl) => {
+    const css = styleEl.textContent ?? "";
+    const re = /font-family\s*:\s*([^;}]+)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(css)) !== null) {
+      parseFontFamily(match[1]).forEach((f) => fontSet.add(f));
+    }
+  });
+
   return {
     valid: true,
     fileSizeKB,
@@ -143,6 +205,7 @@ export function parseSvg(svgText: string): SvgValidation {
     elementCount: elements.length,
     textElementCount: textCount,
     elements,
+    fonts: Array.from(fontSet).sort(),
   };
 }
 

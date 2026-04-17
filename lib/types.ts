@@ -21,6 +21,13 @@ export type TemplateConfig = {
   price: string;
   status: "published" | "draft";
   createdAt: string;
+  /**
+   * Font families detected in the SVG at upload time. The customer
+   * editor injects these as Google Fonts so editable text renders in
+   * the same typeface the admin used in Illustrator. Optional for
+   * backward compatibility with pre-fonts templates.
+   */
+  requiredFonts?: string[];
 };
 
 export type CanvasConfig = {
